@@ -8,7 +8,7 @@ on:
 
 # This section defines the actual tasks to be performed.
 jobs:
-  # We define a single job called "fetch-data"
+  # We define a single job called "fetch-data" 
   fetch-data:
     # This job will run on a virtual machine with the latest version of Ubuntu
     runs-on: ubuntu-latest
