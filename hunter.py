@@ -12,35 +12,24 @@ if not HELIUS_API_KEY or not CEREBRAS_API_KEY:
 
 HELIUS_API_URL = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
 CEREBRAS_API_URL = "https://api.cerebras.com/v1/chat/completions"
-# UPGRADE: We will now analyze more tokens to increase our chances.
-TOKENS_TO_ANALYZE = 20
+# We can now check all 100 tokens from the initial call with no extra cost.
+TOKENS_TO_ANALYZE = 100 
 
 # --- HELPER FUNCTIONS ---
 def get_new_tokens():
-    """Gets the latest tokens created on Solana."""
-    print("Fetching new tokens from Helius...")
+    """Gets the latest 100 tokens created on Solana. This is our ONLY call to Helius."""
+    print("Making our single API call to Helius to fetch new tokens...")
     payload = {
         "jsonrpc": "2.0", "id": "gem-hunter-search", "method": "searchAssets",
-        "params": {"page": 1, "limit": 100, "sortBy": {"sortBy": "created", "sortDirection": "desc"}}
+        "params": {"page": 1, "limit": TOKENS_TO_ANALYZE, "sortBy": {"sortBy": "created", "sortDirection": "desc"}}
     }
     response = requests.post(HELIUS_API_URL, headers={'Content-Type': 'application/json'}, json=payload)
     response.raise_for_status()
     return response.json()['result']['items']
 
-def get_token_details(token_id):
-    """Gets detailed metadata for a single token."""
-    print(f"Fetching details for token: {token_id}")
-    payload = {
-        "jsonrpc": "2.0", "id": "gem-hunter-details", "method": "getAsset",
-        "params": {"id": token_id}
-    }
-    response = requests.post(HELIUS_API_URL, headers={'Content-Type': 'application/json'}, json=payload)
-    response.raise_for_status()
-    return response.json()['result']
-
 def get_ai_analysis(token_data):
     """Sends token data to Cerebras AI for analysis."""
-    print("Token passed the filter! Sending data to Cerebras AI for analysis...")
+    print(f"Token {token_data['id']} passed the filter! Sending data to Cerebras AI...")
     headers = {"Authorization": f"Bearer {CEREBRAS_API_KEY}", "Content-Type": "application/json"}
     
     prompt_data = {
@@ -65,10 +54,7 @@ def get_ai_analysis(token_data):
     4.  **Conclusion:** A final verdict (e.g., "High Risk, Likely a Scam", "Low Risk, Interesting Concept", "Needs More Info").
     """
     
-    payload = {
-        "model": "BTLM-3B-8K-chat",
-        "messages": [{"role": "user", "content": prompt}], "temperature": 0.7
-    }
+    payload = { "model": "BTLM-3B-8K-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7 }
     
     response = requests.post(CEREBRAS_API_URL, headers=headers, json=payload)
     response.raise_for_status()
@@ -78,34 +64,30 @@ def get_ai_analysis(token_data):
 if __name__ == "__main__":
     try:
         new_tokens = get_new_tokens()
-        print(f"Found {len(new_tokens)} new tokens. Analyzing the top {TOKENS_TO_ANALYZE}...")
+        print(f"Found {len(new_tokens)} new tokens. Applying filter and analyzing...")
         
-        for i, token in enumerate(new_tokens[:TOKENS_TO_ANALYZE]):
-            print(f"\n--- Analyzing Token {i+1}/{TOKENS_TO_ANALYZE} ---")
+        for i, token in enumerate(new_tokens):
             token_id = token.get('id')
             
-            try:
-                details = get_token_details(token_id)
-                
-                # --- UPGRADE: THE SMARTER VET ---
-                is_mutable = details.get('mutable', True)
-                links = details.get('content', {}).get('links', {})
-                # We check for any common social link, not just a website.
-                has_socials = any(key in links for key in ['website', 'twitter', 'telegram', 'discord'])
+            # --- THE ULTRA-EFFICIENT VET ---
+            # We apply the filter using data we already have from the first call.
+            is_mutable = token.get('mutable', True)
+            links = token.get('content', {}).get('links', {})
+            has_socials = any(key in links for key in ['website', 'twitter', 'telegram', 'discord'])
 
-                # New Rule: If metadata can be changed AND there are no links, it's a definite skip.
-                if is_mutable and not has_socials:
-                    print(f"RED FLAG: Token is mutable AND has no website/socials. Skipping. Address: {token_id}")
-                    continue
-                
-                # If it passes our smarter filter, send to AI
-                ai_report = get_ai_analysis(details)
+            # If it's mutable AND has no links, it's junk. We don't print anything, just skip.
+            if is_mutable and not has_socials:
+                continue # Silently skip to the next token
+            
+            # If we are here, the token has passed our filter! Now we can analyze it.
+            print(f"\n--- Found a Potential Candidate! ---")
+            try:
+                ai_report = get_ai_analysis(token)
                 print("\n--- AI REPORT ---")
                 print(ai_report)
                 print("-------------------")
-                
             except Exception as e:
-                print(f"Could not analyze token {token_id}. Reason: {e}")
+                print(f"Could not get AI analysis for token {token_id}. Reason: {e}")
 
     except Exception as e:
         print(f"An error occurred in the main process: {e}")
