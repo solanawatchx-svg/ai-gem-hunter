@@ -5,8 +5,8 @@ import os
 # This line safely gets the API key from the GitHub Secrets we set up.
 BIRDEYE_API_KEY = os.environ.get('BIRDEYE_API_KEY')
 
-# The CORRECT address for the dogwifhat (WIF) token.
-token_address = "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzL7M6fNazkOCA"
+# The GUARANTEED CORRECT address for Wrapped SOL (SOL).
+token_address = "So11111111111111111111111111111111111111112"
 
 # Check if the API key was found.
 if not BIRDEYE_API_KEY:
@@ -36,4 +36,3 @@ except requests.exceptions.HTTPError as err:
     print("Response Text:", response.text)
 except Exception as err:
     print(f"An other error occurred: {err}")
-
