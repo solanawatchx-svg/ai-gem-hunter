@@ -3,10 +3,9 @@ import os
 
 # --- CONFIGURATION ---
 # This line safely gets the API key from the GitHub Secrets we set up.
-# It will not work if you run it locally, only in GitHub Actions.
 BIRDEYE_API_KEY = os.environ.get('BIRDEYE_API_KEY')
 
-# The address for the dogwifhat (WIF) token.
+# The CORRECT address for the dogwifhat (WIF) token.
 token_address = "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzL7M6fNazkOCA"
 
 # Check if the API key was found.
@@ -37,4 +36,3 @@ except requests.exceptions.HTTPError as err:
     print("Response Text:", response.text)
 except Exception as err:
     print(f"An other error occurred: {err}")
-
