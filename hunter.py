@@ -36,3 +36,4 @@ except requests.exceptions.HTTPError as err:
     print("Response Text:", response.text)
 except Exception as err:
     print(f"An other error occurred: {err}")
+
