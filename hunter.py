@@ -12,8 +12,8 @@ if not HELIUS_API_KEY or not CEREBRAS_API_KEY:
 
 HELIUS_API_URL = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
 CEREBRAS_API_URL = "https://api.cerebras.com/v1/chat/completions"
-# Set how many of the newest tokens we want to analyze
-TOKENS_TO_ANALYZE = 5
+# UPGRADE: We will now analyze more tokens to increase our chances.
+TOKENS_TO_ANALYZE = 20
 
 # --- HELPER FUNCTIONS ---
 def get_new_tokens():
@@ -40,10 +40,9 @@ def get_token_details(token_id):
 
 def get_ai_analysis(token_data):
     """Sends token data to Cerebras AI for analysis."""
-    print("Sending data to Cerebras AI for analysis...")
+    print("Token passed the filter! Sending data to Cerebras AI for analysis...")
     headers = {"Authorization": f"Bearer {CEREBRAS_API_KEY}", "Content-Type": "application/json"}
     
-    # Create a clean summary of the token data for the AI
     prompt_data = {
         "name": token_data.get('content', {}).get('metadata', {}).get('name', 'N/A'),
         "symbol": token_data.get('content', {}).get('metadata', {}).get('symbol', 'N/A'),
@@ -67,9 +66,8 @@ def get_ai_analysis(token_data):
     """
     
     payload = {
-        "model": "BTLM-3B-8K-chat", # Using a fast and efficient model
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7
+        "model": "BTLM-3B-8K-chat",
+        "messages": [{"role": "user", "content": prompt}], "temperature": 0.7
     }
     
     response = requests.post(CEREBRAS_API_URL, headers=headers, json=payload)
@@ -89,17 +87,18 @@ if __name__ == "__main__":
             try:
                 details = get_token_details(token_id)
                 
-                # --- AUTOMATED VET (SCAM FILTER) ---
+                # --- UPGRADE: THE SMARTER VET ---
                 is_mutable = details.get('mutable', True)
-                has_website = 'website' in details.get('content', {}).get('links', {})
-                
-                if is_mutable:
-                    print(f"RED FLAG: Token metadata is mutable. Skipping AI analysis. Address: {token_id}")
+                links = details.get('content', {}).get('links', {})
+                # We check for any common social link, not just a website.
+                has_socials = any(key in links for key in ['website', 'twitter', 'telegram', 'discord'])
+
+                # New Rule: If metadata can be changed AND there are no links, it's a definite skip.
+                if is_mutable and not has_socials:
+                    print(f"RED FLAG: Token is mutable AND has no website/socials. Skipping. Address: {token_id}")
                     continue
                 
-                # You can add more rules here, e.g., if not has_website: continue
-
-                # If it passes the filter, send to AI
+                # If it passes our smarter filter, send to AI
                 ai_report = get_ai_analysis(details)
                 print("\n--- AI REPORT ---")
                 print(ai_report)
@@ -110,4 +109,3 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"An error occurred in the main process: {e}")
-
