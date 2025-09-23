@@ -1,0 +1,37 @@
+# This is the name of our automated workflow
+name: Run Birdeye API Test
+
+# This tells GitHub WHEN to run the script.
+# "workflow_dispatch" means we can run it manually by clicking a button.
+on:
+  workflow_dispatch:
+
+# This section defines the actual tasks to be performed.
+jobs:
+  # We define a single job called "fetch-data"
+  fetch-data:
+    # This job will run on a virtual machine with the latest version of Ubuntu (a Linux OS)
+    runs-on: ubuntu-latest
+
+    # These are the individual steps the virtual machine will execute
+    steps:
+      # Step 1: Checks out your repository code onto the runner
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      # Step 2: Sets up the Python programming language
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # Step 3: Installs the necessary Python packages (the 'requests' library)
+      - name: Install dependencies
+        run: pip install requests
+
+      # Step 4: Runs our Python script. This is the most important step.
+      - name: Run the python script
+        env:
+          # This line securely passes our GitHub Secret to the script
+          BIRDEYE_API_KEY: ${{ secrets.BIRDEYE_API_KEY }}
+        run: python hunter.py
