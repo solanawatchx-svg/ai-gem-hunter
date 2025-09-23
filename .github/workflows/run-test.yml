@@ -1,5 +1,5 @@
 # This is the name of our automated workflow
-name: Run Birdeye API Test
+name: Run Helius API Test
 
 # This tells GitHub WHEN to run the script.
 # "workflow_dispatch" means we can run it manually by clicking a button.
@@ -10,7 +10,7 @@ on:
 jobs:
   # We define a single job called "fetch-data"
   fetch-data:
-    # This job will run on a virtual machine with the latest version of Ubuntu (a Linux OS)
+    # This job will run on a virtual machine with the latest version of Ubuntu
     runs-on: ubuntu-latest
 
     # These are the individual steps the virtual machine will execute
@@ -25,13 +25,13 @@ jobs:
         with:
           python-version: '3.10'
 
-      # Step 3: Installs the necessary Python packages (the 'requests' library)
+      # Step 3: Installs the necessary Python packages
       - name: Install dependencies
         run: pip install requests
 
-      # Step 4: Runs our Python script. This is the most important step.
+      # Step 4: Runs our Python script
       - name: Run the python script
         env:
-          # This line securely passes our GitHub Secret to the script
-          BIRDEYE_API_KEY: ${{ secrets.BIRDEYE_API_KEY }}
+          # This line securely passes our NEW Helius secret to the script
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
         run: python hunter.py
