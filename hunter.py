@@ -34,16 +34,16 @@ def scrape_pump_fun_socials(token_id):
         response = requests.get(pump_url, headers=headers, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        # Find all links on the page
-        for a_tag in soup.find_all('a', href=True):
-            href = a_tag['href']
-            if 'twitter.com' in href:
-                socials['twitter'] = href
-            if 't.me' in href:
-                socials['telegram'] = href
-            # pump.fun doesn't always have a clear website link, but we can look for it
-            if 'website' in a_tag.text.lower():
-                 socials['website'] = href
+        
+        # Look for specific social links based on common href patterns
+        twitter_link = soup.find('a', href=lambda href: href and "twitter.com" in href)
+        telegram_link = soup.find('a', href=lambda href: href and "t.me" in href)
+        website_link = soup.find('a', class_=lambda c: c and 'link' in c and 'website' in c) # pump.fun uses specific classes
+
+        if twitter_link: socials['twitter'] = twitter_link['href']
+        if telegram_link: socials['telegram'] = telegram_link['href']
+        if website_link: socials['website'] = website_link['href']
+
     except Exception as e:
         print(f"  - Could not scrape pump.fun page: {e}")
     return socials
@@ -57,22 +57,21 @@ def get_ai_analysis(token_data):
         "name": token_data.get('content', {}).get('metadata', {}).get('name', 'N/A'),
         "symbol": token_data.get('content', {}).get('metadata', {}).get('symbol', 'N/A'),
         "on_chain_description": token_data.get('content', {}).get('metadata', {}).get('description', 'N/A'),
-        "on_chain_links": token_data.get('content', {}).get('links', {}),
-        "scraped_pump_fun_links": token_data.get('pump_fun_links', {}), # Add scraped links
+        "all_known_links": token_data.get('all_links', {}),
         "is_mutable": token_data.get('mutable', 'N/A')
     }
 
     prompt = f"""
-    Analyze the following new Solana fungible token. I have provided both its permanent on-chain data and any social links I could find by scraping its pump.fun page.
+    Analyze the following new Solana fungible token. It has passed multiple automated filters.
 
     Token Data:
     {json.dumps(prompt_data, indent=2)}
 
     Your analysis should include:
     1.  **Summary:** A brief overview of what the token purports to be.
-    2.  **Narrative/Hype Potential:** Does the name or description tap into any current crypto trends?
-    3.  **Red Flags:** List any red flags. Pay close attention if on-chain data is missing but scraped data is present (indicates low effort). Is it mutable?
-    4.  **Conclusion:** A final verdict (e.g., "High Risk, Likely a Scam", "Interesting, but risky", "Needs More Info").
+    2.  **Narrative/Hype Potential:** Does the name or description tap into any current crypto trends (e.g., memecoin, AI, DePIN)?
+    3.  **Red Flags:** List any remaining red flags.
+    4.  **Conclusion:** A final verdict (e.g., "High Risk, but has potential", "Interesting Concept", "Still looks low-effort").
     """
     
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -84,30 +83,28 @@ def get_ai_analysis(token_data):
 if __name__ == "__main__":
     try:
         new_assets = get_new_tokens()
-        print(f"Found {len(new_assets)} new assets. Applying filters and off-chain intelligence...")
+        print(f"Found {len(new_assets)} new assets. Applying expert filters...")
         
         for asset in new_assets:
-            # --- VET STEP 1: NFT FILTER ---
+            # VET 1: NFT FILTER
             if 'Fungible' not in asset.get('interface', 'Unknown'):
                 continue
 
-            # --- VET STEP 2: SCAM FILTER ---
-            is_mutable = asset.get('mutable', True)
-            has_on_chain_socials = any(key in asset.get('content', {}).get('links', {}) for key in ['website', 'twitter', 'telegram', 'discord'])
-            if is_mutable and not has_on_chain_socials:
-                continue
-            
-            # --- VET STEP 3: OFF-CHAIN INTELLIGENCE ---
-            # If it passes the basic filters, we enrich it with scraped data
+            # VET 2: OFF-CHAIN INTELLIGENCE & DATA ENRICHMENT
             pump_fun_socials = scrape_pump_fun_socials(asset.get('id'))
-            asset['pump_fun_links'] = pump_fun_socials # Add the scraped links to our asset data
-            
-            # If the token has NO on-chain socials AND NO scraped socials, we skip it.
-            if not has_on_chain_socials and not pump_fun_socials:
+            on_chain_links = asset.get('content', {}).get('links', {})
+            # Combine all found links into one dictionary
+            all_links = {**on_chain_links, **pump_fun_socials}
+            asset['all_links'] = all_links # Save it for the AI report
+
+            # VET 3: THE "PROOF OF EFFORT" FILTER
+            # New Rule: We now require AT LEAST a website AND a twitter to be considered.
+            if 'website' not in all_links or 'twitter' not in all_links:
                 continue
 
-            # If we are here, we have found a potential fungible token gem!
-            print(f"\n--- Found a Potential Token! ---")
+            # If we are here, it's a non-NFT AND has both a website and a twitter.
+            # This is a much stronger candidate for our expensive AI analysis.
+            print(f"\n--- Found a High-Quality Candidate! ---")
             try:
                 ai_report = get_ai_analysis(asset)
                 print("\n--- AI REPORT ---")
