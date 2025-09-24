@@ -21,7 +21,7 @@ HELIUS_API_URL = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
 
 # --- HELPER FUNCTIONS ---
 def get_asset_details(token_id):
-    # This function is unchanged
+    """Gets on-chain details from Helius."""
     print(f"Fetching on-chain details for token: {token_id}")
     payload = {"jsonrpc": "2.0", "id": "test-mode-details", "method": "getAsset", "params": {"id": token_id}}
     response = requests.post(HELIUS_API_URL, headers={'Content-Type': 'application/json'}, json=payload)
@@ -29,22 +29,22 @@ def get_asset_details(token_id):
     return response.json()['result']
 
 def scrape_with_apify(token_id):
-    """-- FINAL ATTEMPT V14 --
-    Uses the powerful Apify platform and its "Website Content Scraper" actor."""
+    """-- FINAL VERSION V15 --
+    Uses the correct Apify 'web-scraper' actor."""
     pump_url = f"https://pump.fun/coin/{token_id}"
-    print(f"  - Starting Apify scrape for {pump_url}...")
+    print(f"  - Starting Apify 'web-scraper' for {pump_url}...")
     socials = {}
     try:
         client = ApifyClient(APIFY_API_TOKEN)
-        # Use Apify's powerful, general-purpose website scraper
-        actor_run = client.actor("apify/website-content-scraper").call(
-            run_input={"startUrls": [{"url": pump_url}]}
+        # THE FIX: Using the correct, more powerful 'web-scraper' actor.
+        actor_run = client.actor("apify/web-scraper").call(
+            run_input={"startUrls": [{"url": pump_url}], "runMode": "production"}
         )
-        # Fetch the HTML result from the dataset
+        
         html_content = ""
         for item in client.dataset(actor_run["defaultDatasetId"]).iterate_items():
             html_content = item.get("html", "")
-            break # We only need the first result
+            break 
 
         if not html_content:
             print("  - Apify ran but returned no HTML content.")
@@ -52,7 +52,6 @@ def scrape_with_apify(token_id):
 
         soup = BeautifulSoup(html_content, 'html.parser')
         
-        # We use the dev's proven data-testid strategy
         anchor_badge = soup.find(attrs={"data-testid": lambda value: value and value.endswith('-social-badge')})
         if anchor_badge:
             print("  - Target Lock Acquired in Apify result via data-testid.")
