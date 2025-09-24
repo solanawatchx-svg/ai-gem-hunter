@@ -28,8 +28,8 @@ def get_asset_details(token_id):
     return response.json()['result']
 
 def scrape_pump_fun_page(token_id):
-    """-- TARGET LOCK SCRAPER V8 --
-    Includes the fix to correctly identify x.com links."""
+    """-- DATA-TESTID SCRAPER V10 (Dev Approved) --
+    Implements the professional strategy of locating the container via stable data-testid attributes."""
     pump_url = f"https://pump.fun/{token_id}"
     print(f"  - Sending scrape request for VISUAL page {pump_url} to ScrapingBee...")
     socials = {}
@@ -42,24 +42,27 @@ def scrape_pump_fun_page(token_id):
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        header_div = soup.find('div', class_=lambda c: c and 'rounded-xl' in c and 'items-center' in c and 'gap-4' in c)
+        # DEV STRATEGY: Find any social badge, then find its parent container.
+        # This is the most stable method.
+        any_social_badge = soup.find(attrs={"data-testid": lambda value: value and value.endswith('-badge')})
         
-        if header_div:
-            print("  - Target Lock Acquired: Found the main header container.")
-            for link in header_div.find_all('a', href=True):
-                href = link['href']
-                # UPDATED to find both twitter.com and x.com
-                if 'twitter.com' in href or 'x.com' in href:
-                    socials['twitter'] = href
-                if 't.me/' in href:
-                    socials['telegram'] = href
-                # The website link icon check
-                svg_use = link.find('use')
-                if svg_use and '#website' in svg_use.get('xlink:href', ''):
-                    socials['website'] = href
-        
-        if socials: print(f"  - Success! Found socials with Target Lock: {socials}")
-        else: print("  - Target Lock failed: Could not find socials in the header container.")
+        if any_social_badge:
+            # Navigate up to the parent 'div' that holds all the badges
+            # Based on inspection, it's usually 2 levels up.
+            socials_container = any_social_badge.find_parent('div').find_parent('div')
+            print("  - Target Lock Acquired: Found the social links container via data-testid.")
+            
+            # Now, we ONLY search for links inside this specific container.
+            twitter_badge = socials_container.find(attrs={"data-testid": "twitter-badge"})
+            website_badge = socials_container.find(attrs={"data-testid": "website-badge"})
+            telegram_badge = socials_container.find(attrs={"data-testid": "telegram-badge"})
+
+            if twitter_badge: socials['twitter'] = twitter_badge.find_parent('a')['href']
+            if website_badge: socials['website'] = website_badge.find_parent('a')['href']
+            if telegram_badge: socials['telegram'] = telegram_badge.find_parent('a')['href']
+
+        if socials: print(f"  - Success! Found socials using data-testid: {socials}")
+        else: print("  - data-testid strategy failed: Could not find any social badges.")
 
     except Exception as e:
         print(f"  - Could not scrape pump.fun page: {e}")
@@ -68,6 +71,7 @@ def scrape_pump_fun_page(token_id):
 def get_ai_analysis(token_data):
     # This function is unchanged
     print(f"Token {token_data['id']} passed filters! Sending data to Google Gemini AI...")
+    # ... (rest is identical)
     headers = {'Content-Type': 'application/json'}
     prompt_data = {
         "name": token_data.get('content', {}).get('metadata', {}).get('name', 'N/A'),
