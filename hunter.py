@@ -37,35 +37,36 @@ def get_asset_details(token_id):
     return response.json()['result']
 
 def scrape_pump_fun_socials(token_id):
-    """-- PRO SCRAPER --
-    Uses ScrapingBee to bypass anti-bot measures and render JavaScript."""
+    """-- SURGICAL SCRAPER V3 --
+    Uses ScrapingBee and targets the specific social links container."""
     pump_url = f"https://pump.fun/{token_id}"
     print(f"  - Sending scrape request for {pump_url} to ScrapingBee...")
     socials = {}
     try:
         response = requests.get(
             'https://app.scrapingbee.com/api/v1/',
-            params={
-                'api_key': SCRAPINGBEE_API_KEY,
-                'url': pump_url,
-                'render_js': 'true', # This tells it to wait for JavaScript to load
-            },
-            timeout=60 # Give it more time to load the page
+            params={'api_key': SCRAPINGBEE_API_KEY, 'url': pump_url, 'render_js': 'true'},
+            timeout=60
         )
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # We can go back to a simpler link finding logic now that we have the real HTML
-        for a_tag in soup.find_all('a', href=True):
-            href = a_tag['href']
-            if 'twitter.com' in href: socials['twitter'] = href
-            if 't.me' in href: socials['telegram'] = href
-            if 'twitter' not in href and 't.me' not in href and 'pump.fun' not in href and 'birdeye' not in href and 'rugcheck' not in href:
-                # If it's an external link that isn't twitter or telegram, it's the website
-                 socials['website'] = href
+        # New Surgical Logic: Find the div that contains the name/ticker, then find the social links div next to it.
+        # This is a much more reliable way to target the correct links.
+        header_div = soup.find('div', class_=lambda c: c and 'flex' in c and 'items-center' in c and 'gap-4' in c)
+        if header_div:
+            # The social links are usually in the same container or a sibling. Let's search within this parent container.
+            for a_tag in header_div.find_all('a', href=True):
+                href = a_tag['href']
+                if 'twitter.com' in href: socials['twitter'] = href
+                if 't.me' in href: socials['telegram'] = href
+                # Check for website link via an icon, a common pattern
+                svg_use = a_tag.find('use')
+                if svg_use and '#website' in svg_use.get('xlink:href', ''):
+                    socials['website'] = href
 
-        if socials: print(f"  - Success! Found socials via ScrapingBee: {socials}")
-        else: print("  - ScrapingBee ran, but no social links were found on the page.")
+        if socials: print(f"  - Success! Found socials via Surgical Scraping: {socials}")
+        else: print("  - Surgical Scraping ran, but no social links were found in the target area.")
 
     except Exception as e:
         print(f"  - Could not scrape using ScrapingBee: {e}")
@@ -74,7 +75,7 @@ def scrape_pump_fun_socials(token_id):
 def get_ai_analysis(token_data):
     # ... (this function is unchanged)
     print(f"Token {token_data['id']} passed all filters! Sending data to Google Gemini AI...")
-    # ... (rest of the function is identical to before)
+    # ... (rest of the function is identical)
     headers = {'Content-Type': 'application/json'}
     prompt_data = {
         "name": token_data.get('content', {}).get('metadata', {}).get('name', 'N/A'),
@@ -120,4 +121,3 @@ if __name__ == "__main__":
             except Exception as e: print(f"Could not get AI analysis for token {asset.get('id')}. Reason: {e}")
 
     except Exception as e: print(f"An error occurred in the main process: {e}")
-
