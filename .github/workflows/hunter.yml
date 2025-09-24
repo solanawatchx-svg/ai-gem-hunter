@@ -1,11 +1,9 @@
 name: AI Gem Hunter (Triggered)
 
 on:
-  # This makes our workflow listen for an external signal
   repository_dispatch:
     types: [run-hourly-hunt]
   
-  # We keep this so you can still run it manually
   workflow_dispatch:
 
 jobs:
@@ -21,7 +19,8 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install requests
+        # We add beautifulsoup4 to read websites
+        run: pip install requests beautifulsoup4
 
       - name: Run the python script
         env:
