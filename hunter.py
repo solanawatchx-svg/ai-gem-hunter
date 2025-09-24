@@ -7,6 +7,11 @@ from bs4 import BeautifulSoup
 HELIUS_API_KEY = os.environ.get('HELIUS_API_KEY')
 GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
 
+# --- TEST MODE CONFIGURATION ---
+# Paste a token address here to test only that one.
+# Set to None to return to normal, hourly hunting mode.
+TEST_MODE_TOKEN_ADDRESS = "EUikxTuKGKq7YcAHYed4dwSCXSEM2cqYZ7FPumMUpump"
+
 if not HELIUS_API_KEY or not GOOGLE_API_KEY:
     print("Error: Make sure HELIUS_API_KEY and GOOGLE_API_KEY secrets are set!")
     exit(1)
@@ -24,9 +29,16 @@ def get_new_tokens():
     response.raise_for_status()
     return response.json()['result']['items']
 
+def get_asset_details(token_id):
+    """Gets detailed metadata for a single token, used in Test Mode."""
+    print(f"Fetching details for token: {token_id}")
+    payload = {"jsonrpc": "2.0", "id": "test-mode-details", "method": "getAsset", "params": {"id": token_id}}
+    response = requests.post(HELIUS_API_URL, headers={'Content-Type': 'application/json'}, json=payload)
+    response.raise_for_status()
+    return response.json()['result']
+
 def scrape_pump_fun_socials(token_id):
-    """-- UPGRADED SCRAPER --
-    Visits the pump.fun page for a token and scrapes social links more robustly."""
+    """-- UPGRADED SCRAPER --"""
     pump_url = f"https://pump.fun/{token_id}"
     print(f"  - Scraping URL: {pump_url}")
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
@@ -35,30 +47,22 @@ def scrape_pump_fun_socials(token_id):
         response = requests.get(pump_url, headers=headers, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # New robust logic: Find the container with social links and check each link inside
         socials_container = soup.find('div', class_=lambda c: c and 'justify-center' in c and 'gap-2' in c)
         if socials_container:
             for a_tag in socials_container.find_all('a', href=True):
                 href = a_tag['href']
                 if 'twitter.com' in href: socials['twitter'] = href
                 if 't.me' in href: socials['telegram'] = href
-                # Heuristic: if it's not twitter or telegram, it's likely the website
-                if 'twitter' not in href and 't.me' not in href:
-                    socials['website'] = href
-        
-        if socials:
-            print(f"  - Success! Found socials: {socials}")
-        else:
-            print("  - No social links found on the page.")
-
-    except Exception as e:
-        print(f"  - Could not scrape pump.fun page: {e}")
+                if 'twitter' not in href and 't.me' not in href: socials['website'] = href
+        if socials: print(f"  - Success! Found socials: {socials}")
+        else: print("  - No social links found on the page.")
+    except Exception as e: print(f"  - Could not scrape pump.fun page: {e}")
     return socials
 
 def get_ai_analysis(token_data):
     # This function remains the same
     print(f"Token {token_data['id']} passed all filters! Sending data to Google Gemini AI...")
+    # ... (rest of the function is identical to before)
     headers = {'Content-Type': 'application/json'}
     prompt_data = {
         "name": token_data.get('content', {}).get('metadata', {}).get('name', 'N/A'),
@@ -73,23 +77,26 @@ def get_ai_analysis(token_data):
     response.raise_for_status()
     return response.json()['candidates'][0]['content']['parts'][0]['text']
 
-# --- MAIN LOGIC (with updated scraper integration) ---
+# --- MAIN LOGIC ---
 if __name__ == "__main__":
     try:
-        new_assets = get_new_tokens()
-        print(f"Found {len(new_assets)} new assets. Applying expert filters...")
-        
-        for asset in new_assets:
-            if 'Fungible' not in asset.get('interface', 'Unknown'):
-                continue
+        if TEST_MODE_TOKEN_ADDRESS:
+            print(f"--- RUNNING IN TEST MODE FOR TOKEN: {TEST_MODE_TOKEN_ADDRESS} ---")
+            asset = get_asset_details(TEST_MODE_TOKEN_ADDRESS)
+            assets_to_process = [asset]
+        else:
+            print("--- RUNNING IN AUTONOMOUS HUNTING MODE ---")
+            assets_to_process = get_new_tokens()
+            print(f"Found {len(assets_to_process)} new assets. Applying expert filters...")
 
+        for asset in assets_to_process:
+            if 'Fungible' not in asset.get('interface', 'Unknown'): continue
+            
             pump_fun_socials = scrape_pump_fun_socials(asset.get('id'))
-            on_chain_links = asset.get('content', {}).get('links', {})
-            all_links = {**on_chain_links, **pump_fun_socials}
+            all_links = {**asset.get('content', {}).get('links', {}), **pump_fun_socials}
             asset['all_links'] = all_links
 
-            if 'website' not in all_links or 'twitter' not in all_links:
-                continue
+            if 'website' not in all_links or 'twitter' not in all_links: continue
 
             print(f"\n--- Found a High-Quality Candidate! ---")
             try:
@@ -97,9 +104,7 @@ if __name__ == "__main__":
                 print("\n--- AI REPORT ---")
                 print(ai_report)
                 print("-------------------")
-            except Exception as e:
-                print(f"Could not get AI analysis for token {asset.get('id')}. Reason: {e}")
+            except Exception as e: print(f"Could not get AI analysis for token {asset.get('id')}. Reason: {e}")
 
-    except Exception as e:
-        print(f"An error occurred in the main process: {e}")
+    except Exception as e: print(f"An error occurred in the main process: {e}")
 
