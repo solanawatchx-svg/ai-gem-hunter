@@ -1,13 +1,11 @@
-name: Run AI Gem Hunter
+name: AI Gem Hunter (Triggered)
 
 on:
-  # This section makes the workflow run automatically
-  schedule:
-    # This is a cron job expression that means "run at the start of every hour"
-    # 0 = minute 0, * = every hour, * = every day, * = every month, * = every day of the week
-    - cron: '0 * * * *'
+  # This makes our workflow listen for an external signal
+  repository_dispatch:
+    types: [run-hourly-hunt]
   
-  # We are keeping this so you can still run it manually whenever you want
+  # We keep this so you can still run it manually
   workflow_dispatch:
 
 jobs:
@@ -28,6 +26,5 @@ jobs:
       - name: Run the python script
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
-          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: python hunter.py
-
