@@ -28,8 +28,8 @@ def get_asset_details(token_id):
     return response.json()['result']
 
 def scrape_pump_fun_page(token_id):
-    """-- DATA-TESTID SCRAPER V10 (Dev Approved) --
-    Implements the professional strategy of locating the container via stable data-testid attributes."""
+    """-- FINAL SCRAPER V11 --
+    Implements the dev's strategy with corrected Python logic."""
     pump_url = f"https://pump.fun/{token_id}"
     print(f"  - Sending scrape request for VISUAL page {pump_url} to ScrapingBee...")
     socials = {}
@@ -42,27 +42,23 @@ def scrape_pump_fun_page(token_id):
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # DEV STRATEGY: Find any social badge, then find its parent container.
-        # This is the most stable method.
-        any_social_badge = soup.find(attrs={"data-testid": lambda value: value and value.endswith('-badge')})
+        # DEV STRATEGY: Find the container, then find links inside it.
+        # This new logic correctly finds the container and then iterates through the links within it.
+        container = soup.find('div', class_=lambda c: c and 'justify-center' in c and 'gap-4' in c)
         
-        if any_social_badge:
-            # Navigate up to the parent 'div' that holds all the badges
-            # Based on inspection, it's usually 2 levels up.
-            socials_container = any_social_badge.find_parent('div').find_parent('div')
-            print("  - Target Lock Acquired: Found the social links container via data-testid.")
-            
-            # Now, we ONLY search for links inside this specific container.
-            twitter_badge = socials_container.find(attrs={"data-testid": "twitter-badge"})
-            website_badge = socials_container.find(attrs={"data-testid": "website-badge"})
-            telegram_badge = socials_container.find(attrs={"data-testid": "telegram-badge"})
+        if container:
+            print("  - Target Lock Acquired: Found the social links container.")
+            links_in_container = container.find_all('a', href=True)
+            for link in links_in_container:
+                if link.find(attrs={"data-testid": "twitter-social-badge"}):
+                    socials['twitter'] = link['href']
+                if link.find(attrs={"data-testid": "website-social-badge"}):
+                    socials['website'] = link['href']
+                if link.find(attrs={"data-testid": "telegram-social-badge"}):
+                    socials['telegram'] = link['href']
 
-            if twitter_badge: socials['twitter'] = twitter_badge.find_parent('a')['href']
-            if website_badge: socials['website'] = website_badge.find_parent('a')['href']
-            if telegram_badge: socials['telegram'] = telegram_badge.find_parent('a')['href']
-
-        if socials: print(f"  - Success! Found socials using data-testid: {socials}")
-        else: print("  - data-testid strategy failed: Could not find any social badges.")
+        if socials: print(f"  - Success! Found socials using dev's strategy: {socials}")
+        else: print("  - Dev strategy failed: Could not find socials within the identified container.")
 
     except Exception as e:
         print(f"  - Could not scrape pump.fun page: {e}")
@@ -71,7 +67,6 @@ def scrape_pump_fun_page(token_id):
 def get_ai_analysis(token_data):
     # This function is unchanged
     print(f"Token {token_data['id']} passed filters! Sending data to Google Gemini AI...")
-    # ... (rest is identical)
     headers = {'Content-Type': 'application/json'}
     prompt_data = {
         "name": token_data.get('content', {}).get('metadata', {}).get('name', 'N/A'),
