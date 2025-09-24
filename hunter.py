@@ -9,7 +9,6 @@ GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
 SCRAPINGBEE_API_KEY = os.environ.get('SCRAPINGBEE_API_KEY')
 
 # --- TEST MODE CONFIGURATION ---
-# We are putting our test token back in for one final verification run.
 TEST_MODE_TOKEN_ADDRESS = "EUikxTuKGKq7YcAHYed4dwSCXSEM2cqYZ7FPumMUpump"
 
 if not HELIUS_API_KEY or not GOOGLE_API_KEY or not SCRAPINGBEE_API_KEY:
@@ -29,51 +28,48 @@ def get_asset_details(token_id):
     return response.json()['result']
 
 def scrape_pump_fun_page(token_id):
-    """-- PRODUCTION SCRAPER (Dev-Tuned) --"""
+    """-- DEV-TUNED SCRAPER V13 --
+    Implements the dev's wait_for strategy for maximum reliability."""
     pump_url = f"https://pump.fun/coin/{token_id}"
-    print(f"  - Scraping (rendered) {pump_url} via ScrapingBee...")
+    print(f"  - Scraping {pump_url} via ScrapingBee with 'wait_for'...")
     socials = {}
     try:
         params = {
             'api_key': SCRAPINGBEE_API_KEY,
             'url': pump_url,
             'render_js': 'true',
-            'wait': '3'
+            # DEV'S STRATEGY: Wait for the social badges to appear in the HTML
+            'wait_for': '[data-testid*="social-badge"]',
+            'wait': '5' # A fallback wait time
         }
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0'}
         r = requests.get('https://app.scrapingbee.com/api/v1/', params=params, headers=headers, timeout=90)
         r.raise_for_status()
         soup = BeautifulSoup(r.text, 'html.parser')
 
-        # Find the first badge that exists to use as an anchor
-        anchor_badge = soup.find(attrs={"data-testid": lambda value: value and value.endswith('-social-badge')})
-        
-        if anchor_badge:
-            print("  - Target Lock Acquired: Found a social badge via data-testid.")
-            # Find the parent container that holds all the links
-            container = anchor_badge.find_parent('a').parent
-            
-            if container:
-                print("  - Located social links container relative to the badge.")
-                for a in container.find_all('a', href=True):
-                    href = a['href'].strip().split('#')[0]
-                    if a.find(attrs={"data-testid": "twitter-social-badge"}): socials['twitter'] = href
-                    if a.find(attrs={"data-testid": "website-social-badge"}): socials['website'] = href
-                    if a.find(attrs={"data-testid": "telegram-social-badge"}): socials['telegram'] = href
+        # Since we waited for the badges, we can now confidently find them
+        twitter_badge = soup.find(attrs={"data-testid": "twitter-social-badge"})
+        website_badge = soup.find(attrs={"data-testid": "website-social-badge"})
+        telegram_badge = soup.find(attrs={"data-testid": "telegram-social-badge"})
+
+        if twitter_badge: socials['twitter'] = twitter_badge.find_parent('a')['href']
+        if website_badge: socials['website'] = website_badge.find_parent('a')['href']
+        if telegram_badge: socials['telegram'] = telegram_badge.find_parent('a')['href']
         
         if socials:
-            print("  - Socials found:", socials)
+            print("  - Success! Socials found:", socials)
         else:
-            print("  - No socials found on page. Dumping HTML snippet for debugging:")
-            print(r.text[:1000])
+            print("  - No socials found on page (wait_for may have timed out).")
+            print("  - HTML Snippet:", r.text[:1000])
 
     except Exception as e:
         print("  - Scrape error:", str(e))
     return socials
 
 def get_ai_analysis(token_data):
-    """Sends token data to Google Gemini AI for analysis."""
+    # This function is unchanged
     print(f"Token {token_data['id']} passed filters! Sending data to Google Gemini AI...")
+    # ... (rest is identical)
     headers = {'Content-Type': 'application/json'}
     prompt_data = {
         "name": token_data.get('content', {}).get('metadata', {}).get('name', 'N/A'),
@@ -90,21 +86,21 @@ def get_ai_analysis(token_data):
 
 # --- MAIN LOGIC ---
 if __name__ == "__main__":
+    # This logic is unchanged
     try:
         if TEST_MODE_TOKEN_ADDRESS:
             print(f"--- RUNNING IN TEST MODE FOR TOKEN: {TEST_MODE_TOKEN_ADDRESS} ---")
             asset = get_asset_details(TEST_MODE_TOKEN_ADDRESS)
             scraped_socials = scrape_pump_fun_page(TEST_MODE_TOKEN_ADDRESS)
             asset['all_links'] = {**asset.get('content', {}).get('links', {}), **scraped_socials}
+            
             print(f"\n--- Test token passed to AI ---")
             ai_report = get_ai_analysis(asset)
             print("\n--- AI REPORT ---")
             print(ai_report)
             print("-------------------")
         else:
-            # Live hunting logic
-            print("--- RUNNING IN AUTONOMOUS HUNTING MODE ---")
-            new_assets = get_new_tokens()
-            # ... (Full logic will be restored after test)
+            # We will restore the full hunting logic later
+            print("--- AUTONOMOUS HUNTING MODE IS NOT YET IMPLEMENTED IN THIS VERSION ---")
     except Exception as e:
         print(f"An error occurred in the main process: {e}")
