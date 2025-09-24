@@ -13,8 +13,8 @@ if not HELIUS_API_KEY or not GOOGLE_API_KEY:
     exit(1)
 
 HELIUS_API_URL = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
-# This is the new Google Gemini API endpoint
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GOOGLE_API_KEY}"
+# --- UPDATE --- Using the latest 'gemini-1.5-flash' model
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GOOGLE_API_KEY}"
 
 # --- HELPER FUNCTIONS ---
 def get_token_details(token_id):
@@ -55,12 +55,10 @@ def get_ai_analysis(token_data):
     4.  **Conclusion:** A final verdict (e.g., "High Risk, Likely a Scam", "Low Risk, Interesting Concept", "Needs More Info").
     """
     
-    # Google Gemini has a different payload structure
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     
     response = requests.post(GEMINI_API_URL, headers=headers, json=payload)
     response.raise_for_status()
-    # The response structure is also different
     return response.json()['candidates'][0]['content']['parts'][0]['text']
 
 # --- MAIN LOGIC ---
