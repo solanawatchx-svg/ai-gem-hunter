@@ -1,0 +1,25 @@
+name: Manual AI Analysis
+
+on:
+  workflow_dispatch:
+
+jobs:
+  manual-analysis-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run the manual analysis script
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+        run: python manual_analysis.py
