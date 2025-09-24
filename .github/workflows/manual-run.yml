@@ -17,14 +17,10 @@ jobs:
 
       - name: Install dependencies
         run: pip install requests
-      
-      # --- NEW DIAGNOSTIC STEP ---
-      - name: Network Diagnostics
-        run: curl -v https://api.cerebras.com/
-      # The '-v' (verbose) flag will show us a detailed step-by-step connection log.
 
       - name: Run the manual analysis script
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
-          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          # We now pass our new Google key to the script
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: python manual_analysis.py
