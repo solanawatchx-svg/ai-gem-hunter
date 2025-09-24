@@ -29,16 +29,16 @@ def get_asset_details(token_id):
     return response.json()['result']
 
 def scrape_with_apify(token_id):
-    """-- FINAL VERSION V15 --
-    Uses the correct Apify 'web-scraper' actor."""
+    """-- FINAL VERSION V16 --
+    Uses the correct, simpler Apify actor 'html-scraper'."""
     pump_url = f"https://pump.fun/coin/{token_id}"
-    print(f"  - Starting Apify 'web-scraper' for {pump_url}...")
+    print(f"  - Starting Apify 'html-scraper' for {pump_url}...")
     socials = {}
     try:
         client = ApifyClient(APIFY_API_TOKEN)
-        # THE FIX: Using the correct, more powerful 'web-scraper' actor.
-        actor_run = client.actor("apify/web-scraper").call(
-            run_input={"startUrls": [{"url": pump_url}], "runMode": "production"}
+        # THE FIX: Using a simpler Actor designed just for getting rendered HTML.
+        actor_run = client.actor("apify/html-scraper").call(
+            run_input={"startUrls": [{"url": pump_url}]}
         )
         
         html_content = ""
@@ -99,4 +99,3 @@ if __name__ == "__main__":
             print("--- AUTONOMOUS HUNTING MODE IS NOT YET IMPLEMENTED IN THIS VERSION ---")
     except Exception as e:
         print(f"An error occurred in the main process: {e}")
-
