@@ -19,11 +19,11 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install requests beautifulsoup4
+        run: pip install requests
 
       - name: Run the python script
         env:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          SCRAPINGBEE_API_KEY: ${{ secrets.SCRAPINGBEE_API_KEY }}
+          # We no longer need the ScrapingBee key for this workflow
         run: python hunter.py
