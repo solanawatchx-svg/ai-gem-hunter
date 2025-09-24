@@ -6,14 +6,13 @@ from bs4 import BeautifulSoup
 # --- CONFIGURATION ---
 HELIUS_API_KEY = os.environ.get('HELIUS_API_KEY')
 GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
+SCRAPINGBEE_API_KEY = os.environ.get('SCRAPINGBEE_API_KEY')
 
 # --- TEST MODE CONFIGURATION ---
-# Paste a token address here to test only that one.
-# Set to None to return to normal, hourly hunting mode.
 TEST_MODE_TOKEN_ADDRESS = "EUikxTuKGKq7YcAHYed4dwSCXSEM2cqYZ7FPumMUpump"
 
-if not HELIUS_API_KEY or not GOOGLE_API_KEY:
-    print("Error: Make sure HELIUS_API_KEY and GOOGLE_API_KEY secrets are set!")
+if not HELIUS_API_KEY or not GOOGLE_API_KEY or not SCRAPINGBEE_API_KEY:
+    print("Error: Make sure HELIUS, GOOGLE, and SCRAPINGBEE API key secrets are set!")
     exit(1)
 
 HELIUS_API_URL = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
@@ -22,7 +21,7 @@ TOKENS_TO_ANALYZE = 100
 
 # --- HELPER FUNCTIONS ---
 def get_new_tokens():
-    """Gets the latest 100 assets created on Solana."""
+    # ... (this function is unchanged)
     print("Making our single API call to Helius to fetch new assets...")
     payload = {"jsonrpc": "2.0", "id": "gem-hunter-search", "method": "searchAssets", "params": {"page": 1, "limit": TOKENS_TO_ANALYZE, "sortBy": {"sortBy": "created", "sortDirection": "desc"}}}
     response = requests.post(HELIUS_API_URL, headers={'Content-Type': 'application/json'}, json=payload)
@@ -30,7 +29,7 @@ def get_new_tokens():
     return response.json()['result']['items']
 
 def get_asset_details(token_id):
-    """Gets detailed metadata for a single token, used in Test Mode."""
+    # ... (this function is unchanged)
     print(f"Fetching details for token: {token_id}")
     payload = {"jsonrpc": "2.0", "id": "test-mode-details", "method": "getAsset", "params": {"id": token_id}}
     response = requests.post(HELIUS_API_URL, headers={'Content-Type': 'application/json'}, json=payload)
@@ -38,29 +37,42 @@ def get_asset_details(token_id):
     return response.json()['result']
 
 def scrape_pump_fun_socials(token_id):
-    """-- UPGRADED SCRAPER --"""
+    """-- PRO SCRAPER --
+    Uses ScrapingBee to bypass anti-bot measures and render JavaScript."""
     pump_url = f"https://pump.fun/{token_id}"
-    print(f"  - Scraping URL: {pump_url}")
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+    print(f"  - Sending scrape request for {pump_url} to ScrapingBee...")
     socials = {}
     try:
-        response = requests.get(pump_url, headers=headers, timeout=10)
+        response = requests.get(
+            'https://app.scrapingbee.com/api/v1/',
+            params={
+                'api_key': SCRAPINGBEE_API_KEY,
+                'url': pump_url,
+                'render_js': 'true', # This tells it to wait for JavaScript to load
+            },
+            timeout=60 # Give it more time to load the page
+        )
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        socials_container = soup.find('div', class_=lambda c: c and 'justify-center' in c and 'gap-2' in c)
-        if socials_container:
-            for a_tag in socials_container.find_all('a', href=True):
-                href = a_tag['href']
-                if 'twitter.com' in href: socials['twitter'] = href
-                if 't.me' in href: socials['telegram'] = href
-                if 'twitter' not in href and 't.me' not in href: socials['website'] = href
-        if socials: print(f"  - Success! Found socials: {socials}")
-        else: print("  - No social links found on the page.")
-    except Exception as e: print(f"  - Could not scrape pump.fun page: {e}")
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # We can go back to a simpler link finding logic now that we have the real HTML
+        for a_tag in soup.find_all('a', href=True):
+            href = a_tag['href']
+            if 'twitter.com' in href: socials['twitter'] = href
+            if 't.me' in href: socials['telegram'] = href
+            if 'twitter' not in href and 't.me' not in href and 'pump.fun' not in href and 'birdeye' not in href and 'rugcheck' not in href:
+                # If it's an external link that isn't twitter or telegram, it's the website
+                 socials['website'] = href
+
+        if socials: print(f"  - Success! Found socials via ScrapingBee: {socials}")
+        else: print("  - ScrapingBee ran, but no social links were found on the page.")
+
+    except Exception as e:
+        print(f"  - Could not scrape using ScrapingBee: {e}")
     return socials
 
 def get_ai_analysis(token_data):
-    # This function remains the same
+    # ... (this function is unchanged)
     print(f"Token {token_data['id']} passed all filters! Sending data to Google Gemini AI...")
     # ... (rest of the function is identical to before)
     headers = {'Content-Type': 'application/json'}
@@ -79,6 +91,7 @@ def get_ai_analysis(token_data):
 
 # --- MAIN LOGIC ---
 if __name__ == "__main__":
+    # ... (this logic is unchanged)
     try:
         if TEST_MODE_TOKEN_ADDRESS:
             print(f"--- RUNNING IN TEST MODE FOR TOKEN: {TEST_MODE_TOKEN_ADDRESS} ---")
