@@ -17,6 +17,11 @@ jobs:
 
       - name: Install dependencies
         run: pip install requests
+      
+      # --- NEW DIAGNOSTIC STEP ---
+      - name: Network Diagnostics
+        run: curl -v https://api.cerebras.com/
+      # The '-v' (verbose) flag will show us a detailed step-by-step connection log.
 
       - name: Run the manual analysis script
         env:
